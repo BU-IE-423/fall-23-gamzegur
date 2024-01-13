@@ -2,6 +2,7 @@
 ## Gamze Gür's Progress Journal for IE 423 Fall'23
 
 [IE 423 PART 3 PDF REPORT](https://bu-ie-423.github.io/fall-23-gamzegur/Reportprojectpart3pdf.pdf)
+
 [IE 423 PART 3 HTML](https://bu-ie-423.github.io/fall-23-gamzegur/projectpart3.html)
 
 
