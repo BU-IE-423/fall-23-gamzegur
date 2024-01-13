@@ -1,0 +1,179 @@
+---
+title: Project Part3 - A Baseline Defect Detection Approach from a Statistical Data
+  Analysis Perspective
+output:
+  html_document:
+    df_print: paged
+---
+## 1) Plotting the histogram
+In this part, we converted the image from colored one to grey scaled one. We drew histogram with the pixel values. At the first view ,the distribution of pixels looks like a normal distribution.
+
+```{r}
+library(jpeg)
+par(mfrow=c(1,1))
+image75 <- readJPEG("C:\\Users\\lenovo\\Desktop\\423-part3\\0075.jpg") # read the color image
+
+grayimg <- image75[,,1]
+hist(grayimg, pch=20, breaks=20, prob=TRUE, main="Histogram of Pixel Values")
+```
+
+## 2) Finding distribution and calculating the mean and the standard deviation
+We fit the distribution as a normal distribution with red line. The red line fits nearly perfect so that we can assume the distribution is normally distributed. 
+
+```{r}
+library(MASS)
+fit = fitdistr(grayimg, densfun = "normal")
+hist(grayimg, pch=20, breaks=20, prob=TRUE, main="Histogram of Pixel Values")
+curve(dnorm(x, fit$estimate[1], fit$estimate[2]), col="red", lwd=2, add=T)
+```
+
+Then, we calculated the mean and standard deviation values of this distribution.
+
+```{r}
+mu<- mean(grayimg)
+sd<- sd(grayimg)
+variance <- (sd^2)
+cat("Pixel values are assumed to be distributed normally with mean ", round(mu, digits = 3), " and standard deviation ", round(sd, digits = 3), ".")
+
+```
+
+## 3) Finding pixels out of bounds (outliers)
+Initially, we determine the lower and upper limits at a significance level of 0.001. Pixels falling within this range are deemed acceptable, while those outside the boundaries are identified as outliers. The count of pixels exceeding this interval can be computed as follows:
+
+```{r}
+significance_level=0.001
+#Upper and Lower Bounds Based on Normality Assumption
+lowerbound<- mu + qnorm(significance_level/2)*sd
+upperbound<- mu + qnorm((1-significance_level/2))*sd
+
+cat("The lower bound is ", round(lowerbound, digits = 3), " and the upper bound is ", round(upperbound, digits = 3), ".")
+
+below <- sum(grayimg< lowerbound) 
+above <-sum(grayimg> upperbound)
+
+cat("The number of total outlier is ", below + above)
+
+
+```
+
+Subsequently, a variable is generated based on the following logic, wherein values outside the determined bounds are set to zero (representing black color):
+
+```{r}
+grayimg1 <- (grayimg< upperbound)*(grayimg > lowerbound)*grayimg
+plot(c(0,512), c(0,1124), xlab = "Width", ylab = " ")
+rasterImage(grayimg, 0, 612, 512, 1124)
+rasterImage(grayimg1,0, 0, 512, 512 )
+```
+
+In this way, it is expected that outlier values that are extremely bright or dark can be identified.In this case, as evident from the total number of outliers, it is likely that an insufficient number of outliers has been detected due to the possibly overly wide lower and upper bound intervals. Also, the reason for the existing outliers not being visible in the image may be that these outlier values are already quite dark.Because we found zero when we calculate the number of pixels that are extremely bright, contrary to the number of pixels that are extremely dark.It can be a good option to re -experience the algorithm through another image with different features or different significance level.
+
+
+## 4) Performing image operations on the patches 
+Given that local structures offer a more detailed view of surface quality in this context, applying image operations on patches instead of the entire picture could be advantageous. To address the challenge of inspecting the distribution of all patches, the image was divided into 100 mutually exclusive patches, each sized 51x51. To streamline the process, a sample of size 3 was randomly selected using the following commands:
+
+```{r}
+set.seed(75)
+for(k in 1:3){
+i<- floor(runif(1, min=0, max=10)) #Generates a random integer between 0 and 9
+j<- floor(runif(1, min=0, max=10)) #Generates a random integer between 0 and 9
+randompatch <- grayimg[(1+(51*i)):(51+(51*i)),(1+(51*j)):(51+(51*j))] 
+hist(randompatch, breaks = 20)
+}
+
+```
+
+Based on the insights gained from these histograms, the assumption was made that the distribution of individual patches is also normal.
+
+The original image was then processed patch by patch using the following commands:
+
+```{r}
+grayimg2 <- grayimg
+outliers<- 0
+for (i in 0:9){
+  for (j in 0:9){
+    imgtemp <- grayimg2[(1+(51*i)):(51+(51*i)),(1+(51*j)):(51+(51*j))] 
+    mutemp <-mean(imgtemp)
+    sdtemp <-sd(imgtemp)
+    lbtemp <- mutemp + qnorm(significance_level/2)*sdtemp
+    ubtemp <- mutemp + qnorm((1-significance_level/2))*sdtemp
+    outliers<- outliers + sum(grayimg< lowerbound) + sum(grayimg> upperbound)
+    grayimg2[(1+(51*i)):(51+(51*i)),(1+(51*j)):(51+(51*j))] <- (imgtemp<ubtemp)*(imgtemp>lbtemp)*imgtemp
+  }
+}
+
+plot(c(0,512), c(0,1124), xlab = "Width", ylab = " ")
+rasterImage(grayimg, 0, 612, 512, 1124)
+rasterImage(grayimg2,0, 0, 512, 512 )
+outliers
+```
+
+
+In this process, a higher number of pixels have been labeled as outliers compared to Question 3 because we examined outliers within each patch. We can perceive this result from the outlier count, but still it cannot detected clearly by looking at the visual representation since the number of outliers is still less than expected. In Question 3, since the mean and variance more appropriately represented the characteristics of the image, the number of outliers was lower, making it challenging to observe. However, in this case, a lower variation has been observed due to the higher similarity among pixels within the same patch. Therefore, relatively small deviations from the patch mean may lead to an outlier diagnosis.By setting lower significance level or choosing another image, the result can be observed more clearly.
+
+
+##Additional
+
+In order to better observe the process, let's change the significance level to 0.1 and observe how outliers are obtained.
+
+```{r}
+significance_level=0.01
+#Upper and Lower Bounds Based on Normality Assumption
+lowerbound<- mu + qnorm(significance_level/2)*sd
+upperbound<- mu + qnorm((1-significance_level/2))*sd
+
+cat("The lower bound is ", round(lowerbound, digits = 3), " and the upper bound is ", round(upperbound, digits = 3), ".")
+
+below <- sum(grayimg< lowerbound) 
+above <-sum(grayimg> upperbound)
+
+cat("The number of total outlier is ", below + above)
+```
+
+
+```{r}
+grayimg1 <- (grayimg< upperbound)*(grayimg > lowerbound)*grayimg
+plot(c(0,512), c(0,1124), xlab = "Width", ylab = " ")
+rasterImage(grayimg, 0, 612, 512, 1124)
+rasterImage(grayimg1,0, 0, 512, 512 )
+```
+
+
+```{r}
+set.seed(75)
+for(k in 1:3){
+i<- floor(runif(1, min=0, max=10)) #Generates a random integer between 0 and 9
+j<- floor(runif(1, min=0, max=10)) #Generates a random integer between 0 and 9
+randompatch <- grayimg[(1+(51*i)):(51+(51*i)),(1+(51*j)):(51+(51*j))] 
+hist(randompatch, breaks = 20)
+}
+```
+
+
+```{r}
+grayimg2 <- grayimg
+outliers<- 0
+for (i in 0:9){
+  for (j in 0:9){
+    imgtemp <- grayimg2[(1+(51*i)):(51+(51*i)),(1+(51*j)):(51+(51*j))] 
+    mutemp <-mean(imgtemp)
+    sdtemp <-sd(imgtemp)
+    lbtemp <- mutemp + qnorm(significance_level/2)*sdtemp
+    ubtemp <- mutemp + qnorm((1-significance_level/2))*sdtemp
+    outliers<- outliers + sum(grayimg< lowerbound) + sum(grayimg> upperbound)
+    grayimg2[(1+(51*i)):(51+(51*i)),(1+(51*j)):(51+(51*j))] <- (imgtemp<ubtemp)*(imgtemp>lbtemp)*imgtemp
+  }
+}
+
+plot(c(0,512), c(0,1124), xlab = "Width", ylab = " ")
+rasterImage(grayimg, 0, 612, 512, 1124)
+rasterImage(grayimg2,0, 0, 512, 512 )
+
+cat("The number of total outlier is ", outliers)
+
+
+```
+
+As observed, the number of outliers for Question3 has increased to 976, while the number of outliers in Question4 has risen to 97600. The outliers marked in black are visibly prominent.
+
+
+
